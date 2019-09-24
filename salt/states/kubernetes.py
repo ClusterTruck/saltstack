@@ -584,7 +584,7 @@ def configmap_absent(name, namespace="default", **kwargs):
 
 
 def configmap_present(
-    name, namespace="default", data=None, source=None, template=None, **kwargs
+    name, namespace="default", data=None, source=None, sources=None, template=None, **kwargs
 ):
     """
     Ensures that the named configmap is present inside of the specified namespace
@@ -604,15 +604,21 @@ def configmap_present(
     source
         A file containing the data of the configmap in plain format.
 
+    sources
+        A dictionary holding a mapping of config to source file. This can be used to
+        in lieu of a source file to map to templated config files in separate files,
+        rather than putting all configs in one source file.
+
     template
-        Template engine to be used to render the source file.
+        Template engine to be used to render the source file(s).
     """
     ret = {"name": name, "changes": {}, "result": False, "comment": ""}
 
-    if data and source:
-        return _error(ret, "'source' cannot be used in combination with 'data'")
-    elif data is None:
-        data = {}
+    if (data and source) or (data and sources) or (source and sources):
+        return _error(
+            ret,
+            'you may only provide one of \'data\', \'source\', or \'sources\''
+        )
 
     configmap = __salt__["kubernetes.show_configmap"](name, namespace, **kwargs)
 
@@ -626,6 +632,7 @@ def configmap_present(
             namespace=namespace,
             data=data,
             source=source,
+            sources=sources,
             template=template,
             saltenv=__env__,
             **kwargs
@@ -645,6 +652,7 @@ def configmap_present(
             namespace=namespace,
             data=data,
             source=source,
+            sources=sources,
             template=template,
             saltenv=__env__,
             **kwargs

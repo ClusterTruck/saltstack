@@ -1197,7 +1197,7 @@ def create_secret(
 
 
 def create_configmap(
-    name, namespace, data, source=None, template=None, saltenv="base", **kwargs
+    name, namespace, data, source=None, sources=None, template=None, saltenv="base", **kwargs
 ):
     """
     Creates the kubernetes configmap as defined by the user.
@@ -1210,7 +1210,12 @@ def create_configmap(
         salt 'minion2' kubernetes.create_configmap \
             name=settings namespace=default data='{"example.conf": "# example file"}'
     """
-    if source:
+    if sources:
+        data = {}
+        for key, file_path in iteritems(sources):
+            file_data = __read_and_render_template_file(file_path, template, saltenv)
+            data[key] = file_data
+    elif source:
         data = __read_and_render_yaml_file(source, template, saltenv)
     elif data is None:
         data = {}
@@ -1460,6 +1465,7 @@ def replace_configmap(
     name,
     data,
     source=None,
+    souces=None,
     template=None,
     saltenv="base",
     namespace="default",
@@ -1477,6 +1483,11 @@ def replace_configmap(
         salt 'minion2' kubernetes.replace_configmap \
             name=settings namespace=default data='{"example.conf": "# example file"}'
     """
+    if sources:
+        data = {}
+        for key, file_path in iteritems(sources):
+            file_data = __read_and_render_template_file(file_path, template, saltenv)
+            data[key] = file_data
     if source:
         data = __read_and_render_yaml_file(source, template, saltenv)
 
@@ -1621,10 +1632,10 @@ def __create_object_body_with_subsets(
         subsets=subsets_creator(subsets))
 
 
-def __read_and_render_yaml_file(source, template, saltenv):
+def __read_and_render_template_file(source, template, saltenv):
     """
-    Read a yaml file and, if needed, renders that using the specifieds
-    templating. Returns the python objects defined inside of the file.
+    Read a template file and, if needed, renders that using the specified
+    templating. Returns the string contents of the file.
     """
     sfn = __salt__["cp.cache_file"](source, saltenv)
     if not sfn:
@@ -1662,8 +1673,15 @@ def __read_and_render_yaml_file(source, template, saltenv):
                     "Unknown template specified: {0}".format(template)
                 )
 
-        return salt.utils.yaml.safe_load(contents)
+        return contents
 
+def __read_and_render_yaml_file(source, template, saltenv):
+    """
+    Read a yaml file and, if needed, renders that using the specified
+    templating. Returns the python objects defined inside of the file.
+    """
+    contents = __read_and_render_template_file(source, template, saltenv).encode("utf-8")
+    return salt.utils.yaml.safe_load(contents)
 
 def __dict_to_object_meta(name, namespace, metadata):
     """
