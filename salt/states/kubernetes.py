@@ -1007,3 +1007,139 @@ def node_label_present(
     ret['result'] = True
 
     return ret
+
+
+def endpoints_absent(name, namespace='default', **kwargs):
+    '''
+    Ensures that the named endpoints are absent from the given namespace.
+
+    name
+        The name of the endpoints
+
+    namespace
+        The name of the namespace
+    '''
+
+    ret = {'name': name,
+           'changes': {},
+           'result': False,
+           'comment': ''}
+
+    endpoints  = __salt__['kubernetes.show_endpoints'](name, namespace, **kwargs)
+
+    if endpoints is None:
+        ret['result'] = True if not __opts__['test'] else None
+        ret['comment'] = 'The endpoints do not exist'
+        return ret
+
+    if __opts__['test']:
+        ret['comment'] = 'The endpoints are going to be deleted'
+        ret['result'] = None
+        return ret
+
+    res = __salt__['kubernetes.delete_endpoints'](name, namespace, **kwargs)
+    if res['status'] == 'Success':
+        ret['result'] = True
+        ret['changes'] = {
+            'kubernetes.endpoints': {
+                'new': 'absent', 'old': 'present'}}
+        ret['comment'] = res['message']
+    else:
+        ret['comment'] = 'Something went wrong, response: {0}'.format(res)
+
+    return ret
+
+def endpoints_present(
+        name,
+        namespace='default',
+        metadata=None,
+        spec=None,
+        source='',
+        template='',
+        **kwargs):
+    '''
+    Ensures the named endpoints are present inside of the specified namespace
+    with the given metadata and spec.
+    If the endpoints exist they will be replaced.
+
+    name
+        The name of the endpoints.
+
+    namespace
+        The namespace holding the enedpoint. The 'default' one is going to be
+        used unless a different one is specified.
+
+    metadata
+        The metadata of the endpoints object.
+
+    spec
+        The spec of the endpoints object.
+
+    source
+        A file containing the definition of the endpoints (metadata and
+        spec) in the official kubernetes format.
+
+    template
+        Template engine to be used to render the source file.
+    '''
+    ret = {'name': name,
+           'changes': {},
+           'result': False,
+           'comment': ''}
+
+    if (metadata or spec) and source:
+        return _error(
+            ret,
+            '\'source\' cannot be used in combination with \'metadata\' or '
+            '\'spec\''
+        )
+
+    if metadata is None:
+        metadata = {}
+
+    if spec is None:
+        spec = {}
+
+    endpoints = __salt__['kubernetes.show_endpoints'](name, namespace, **kwargs)
+
+    if endpoints is None:
+        if __opts__['test']:
+            ret['result'] = None
+            ret['comment'] = 'The endpoints are going to be created'
+            return ret
+        res = __salt__['kubernetes.create_endpoints'](name=name,
+                                                     namespace=namespace,
+                                                     metadata=metadata,
+                                                     spec=spec,
+                                                     source=source,
+                                                     template=template,
+                                                     saltenv=__env__,
+                                                     **kwargs)
+        ret['changes']['{0}.{1}'.format(namespace, name)] = {
+            'old': {},
+            'new': res}
+    else:
+        if __opts__['test']:
+            ret['result'] = None
+            return ret
+
+        # TODO: improve checks  # pylint: disable=fixme
+        log.info('Forcing the recreation of the endpoints')
+        ret['comment'] = 'The endpoints are already present. Forcing recreation'
+        res = __salt__['kubernetes.replace_endpoints'](
+            name=name,
+            namespace=namespace,
+            metadata=metadata,
+            spec=spec,
+            source=source,
+            template=template,
+            old_endpoints=endpoints,
+            saltenv=__env__,
+            **kwargs)
+
+    ret['changes'] = {
+        'metadata': metadata,
+        'spec': spec
+    }
+    ret['result'] = True
+    return ret
