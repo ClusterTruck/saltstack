@@ -610,6 +610,34 @@ def endpoints(namespace="default", **kwargs):
         _cleanup(**cfg)
 
 
+def statefulsets(namespace="default", **kwargs):
+    """
+    Return a list of kubernetes stateful sets defined in the namespace
+
+    CLI Examples::
+
+        salt '*' kubernetes.statefulsets
+        salt '*' kubernetes.statefulsets namespace=default
+    """
+    cfg = _setup_conn(**kwargs)
+    try:
+        api_instance = kubernetes.client.AppsV1Api()
+        api_response = api_instance.list_namespaced_stateful_set(namespace)
+
+        return [secret["metadata"]["name"] for secret in api_response.to_dict().get("items")]
+    except (ApiException, HTTPError) as exc:
+        if isinstance(exc, ApiException) and exc.status == 404:
+            return None
+        else:
+            log.exception(
+                "Exception when calling "
+                "AppsV1Api->list_namespaced_stateful_set"
+            )
+            raise CommandExecutionError(exc)
+    finally:
+        _cleanup(**cfg)
+
+
 def show_deployment(name, namespace="default", **kwargs):
     """
     Return the kubernetes deployment defined by name and namespace
@@ -796,6 +824,36 @@ def show_endpoints(name, namespace="default", **kwargs):
             log.exception(
                 "Exception when calling "
                 "CoreV1Api->read_namespaced_endpoints"
+            )
+            raise CommandExecutionError(exc)
+    finally:
+        _cleanup(**cfg)
+
+
+def show_statefulset(name, namespace="default", **kwargs):
+    """
+    Return the kubernetes stateful set defined by name and namespace.
+
+    CLI Examples::
+
+        salt '*' kubernetes.show_statefulset game-set default
+        salt '*' kubernetes.show_statefulset name=game-set namespace=default
+    """
+    cfg = _setup_conn(**kwargs)
+    try:
+        api_instance = kubernetes.client.AppsV1Api()
+        api_response = api_instance.read_namespaced_stateful_set(
+            name,
+            namespace)
+
+        return api_response.to_dict()
+    except (ApiException, HTTPError) as exc:
+        if isinstance(exc, ApiException) and exc.status == 404:
+            return None
+        else:
+            log.exception(
+                "Exception when calling "
+                "AppsV1Api->read_namespaced_stateful_set"
             )
             raise CommandExecutionError(exc)
     finally:
@@ -1025,6 +1083,39 @@ def delete_endpoints(name, namespace='default', **kwargs):
         else:
             log.exception(
                 "Exception when calling CoreV1Api->delete_namespaced_endpoints"
+            )
+            raise CommandExecutionError(exc)
+    finally:
+        _cleanup(**cfg)
+
+
+def delete_statefulset(name, namespace="default", **kwargs):
+    """
+    Deletes the kubernetes stateful set defined by name and namespace
+
+    CLI Examples::
+
+        salt '*' kubernetes.delete_statefulset game-set default
+        salt '*' kubernetes.delete_statefulset name=game-set namespace=default
+    """
+    cfg = _setup_conn(**kwargs)
+    body = kubernetes.client.V1DeleteOptions(orphan_dependents=True)
+
+    try:
+        api_instance = kubernetes.client.AppsV1Api()
+        api_response = api_instance.delete_namespaced_stateful_set(
+            name=name,
+            namespace=namespace,
+            body=body)
+
+        return api_response.to_dict()
+    except (ApiException, HTTPError) as exc:
+        if isinstance(exc, ApiException) and exc.status == 404:
+            return None
+        else:
+            log.exception(
+                "Exception when calling "
+                "AppsV1Api->delete_namespaced_stateful_set"
             )
             raise CommandExecutionError(exc)
     finally:
@@ -1314,6 +1405,45 @@ def create_endpoints(
         _cleanup(**cfg)
 
 
+def create_statefulset(
+    name, namespace, metadata, spec, source, template, saltenv, **kwargs
+):
+    """
+    Creates the kubernetes stateful set as defined by the user.
+    """
+    body = __create_object_body(
+        kind="StatefulSet",
+        obj_class=kubernetes.client.V1StatefulSet,
+        spec_creator=__dict_to_statefulset_spec,
+        name=name,
+        namespace=namespace,
+        metadata=metadata,
+        spec=spec,
+        source=source,
+        template=template,
+        saltenv=saltenv)
+
+    cfg = _setup_conn(**kwargs)
+
+    try:
+        api_instance = kubernetes.client.AppsV1Api()
+        api_response = api_instance.create_namespaced_stateful_set(
+            namespace, body)
+
+        return api_response.to_dict()
+    except (ApiException, HTTPError) as exc:
+        if isinstance(exc, ApiException) and exc.status == 404:
+            return None
+        else:
+            log.exception(
+                "Exception when calling "
+                "AppsV1Api->create_namespaced_stateful_set"
+            )
+            raise CommandExecutionError(exc)
+    finally:
+        _cleanup(**cfg)
+
+
 def replace_deployment(
     name, metadata, spec, source, template, saltenv, namespace="default", **kwargs
 ):
@@ -1561,6 +1691,46 @@ def replace_endpoints(
         _cleanup(**cfg)
 
 
+def replace_statefulset(
+    name, metadata, spec, source, template, saltenv, namespace="default", **kwargs
+):
+    """
+    Replaces an existing stateful set with a new one defined by name and
+    namespace, having the specificed metadata and spec.
+    """
+    body = __create_object_body(
+        kind="StatefulSet",
+        obj_class=kubernetes.client.V1StatefulSet,
+        spec_creator=__dict_to_statefulset_spec,
+        name=name,
+        namespace=namespace,
+        metadata=metadata,
+        spec=spec,
+        source=source,
+        template=template,
+        saltenv=saltenv)
+
+    cfg = _setup_conn(**kwargs)
+
+    try:
+        api_instance = kubernetes.client.AppsV1Api()
+        api_response = api_instance.replace_namespaced_stateful_set(
+            name, namespace, body)
+
+        return api_response.to_dict()
+    except (ApiException, HTTPError) as exc:
+        if isinstance(exc, ApiException) and exc.status == 404:
+            return None
+        else:
+            log.exception(
+                "Exception when calling "
+                "AppsV1Api->replace_namespaced_stateful_set"
+            )
+            raise CommandExecutionError(exc)
+    finally:
+        _cleanup(**cfg)
+
+
 def __create_object_body(
     kind,
     obj_class,
@@ -1780,6 +1950,19 @@ def __dict_to_endpoints_subsets(subsets):
         subset_objs.append(subset_obj)
 
     return subset_objs
+
+
+def __dict_to_statefulset_spec(spec):
+    """
+    Converts a dictionary into kubernetes V1StatefulSetSpec instance.
+    """
+    #spec_obj = kubernetes.client.V1StatefulSetSpec(template=spec.get("template", ""))
+    spec_obj = kubernetes.client.V1StatefulSetSpec(selector=spec.get("selector", ""), service_name=spec.get("service_name", ""), template=spec.get("template", ""))
+    for key, value in iteritems(spec):
+        if hasattr(spec_obj, key):
+            setattr(spec_obj, key, value)
+
+    return spec_obj
 
 
 def __enforce_only_strings_dict(dictionary):
