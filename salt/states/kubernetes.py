@@ -639,6 +639,7 @@ def configmap_present(
         namespace='default',
         data=None,
         source=None,
+        sources=None,
         template=None,
         **kwargs):
     '''
@@ -659,18 +660,23 @@ def configmap_present(
     source
         A file containing the data of the configmap in plain format.
 
+    sources
+        A dictionary holding a mapping of config to source file. This can be used to
+        in lieu of a source file to map to templated config files in separate files,
+        rather than putting all configs in one source file.
+
     template
-        Template engine to be used to render the source file.
+        Template engine to be used to render the source file(s).
     '''
     ret = {'name': name,
            'changes': {},
            'result': False,
            'comment': ''}
 
-    if data and source:
+    if (data and source) or (data and sources) or (source and sources):
         return _error(
             ret,
-            '\'source\' cannot be used in combination with \'data\''
+            'you may only provide one of \'data\', \'source\', or \'sources\''
         )
     elif data is None:
         data = {}
@@ -686,6 +692,7 @@ def configmap_present(
                                                       namespace=namespace,
                                                       data=data,
                                                       source=source,
+                                                      sources=sources,
                                                       template=template,
                                                       saltenv=__env__,
                                                       **kwargs)
@@ -706,6 +713,7 @@ def configmap_present(
             namespace=namespace,
             data=data,
             source=source,
+            sources=sources,
             template=template,
             saltenv=__env__,
             **kwargs)
