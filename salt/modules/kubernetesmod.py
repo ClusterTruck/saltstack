@@ -582,6 +582,34 @@ def configmaps(namespace="default", **kwargs):
         _cleanup(**cfg)
 
 
+def endpoints(namespace="default", **kwargs):
+    """
+    Return a list of kubernetes endpoints defined in the namespace
+
+    CLI Examples::
+
+        salt '*' kubernetes.endpoints
+        salt '*' kubernetes.endpoints namespace=default
+    """
+    cfg = _setup_conn(**kwargs)
+    try:
+        api_instance = kubernetes.client.CoreV1Api()
+        api_response = api_instance.list_namespaced_endpoints(namespace)
+
+        return [secret["metadata"]["name"] for secret in api_response.to_dict().get("items")]
+    except (ApiException, HTTPError) as exc:
+        if isinstance(exc, ApiException) and exc.status == 404:
+            return None
+        else:
+            log.exception(
+                "Exception when calling "
+                "CoreV1Api->list_namespaced_endpoints"
+            )
+            raise CommandExecutionError(exc)
+    finally:
+        _cleanup(**cfg)
+
+
 def show_deployment(name, namespace="default", **kwargs):
     """
     Return the kubernetes deployment defined by name and namespace
@@ -740,6 +768,34 @@ def show_configmap(name, namespace="default", **kwargs):
         else:
             log.exception(
                 "Exception when calling " "CoreV1Api->read_namespaced_config_map"
+            )
+            raise CommandExecutionError(exc)
+    finally:
+        _cleanup(**cfg)
+
+
+def show_endpoints(name, namespace="default", **kwargs):
+    """
+    Return the kubernetes endpoints defined by name and namespace
+
+    CLI Examples::
+
+        salt '*' kubernetes.show_endpoints my-nginx default
+        salt '*' kubernetes.show_endpoints name=my-nginx namespace=default
+    """
+    cfg = _setup_conn(**kwargs)
+    try:
+        api_instance = kubernetes.client.CoreV1Api()
+        api_response = api_instance.read_namespaced_endpoints(name, namespace)
+
+        return api_response.to_dict()
+    except (ApiException, HTTPError) as exc:
+        if isinstance(exc, ApiException) and exc.status == 404:
+            return None
+        else:
+            log.exception(
+                "Exception when calling "
+                "CoreV1Api->read_namespaced_endpoints"
             )
             raise CommandExecutionError(exc)
     finally:
@@ -939,6 +995,36 @@ def delete_configmap(name, namespace="default", **kwargs):
         else:
             log.exception(
                 "Exception when calling " "CoreV1Api->delete_namespaced_config_map"
+            )
+            raise CommandExecutionError(exc)
+    finally:
+        _cleanup(**cfg)
+
+
+def delete_endpoints(name, namespace='default', **kwargs):
+    """
+    Deletes the kubernetes endpoints defined by name and namespace
+
+    CLI Examples::
+
+        salt '*' kubernetes.delete_endpoints my-nginx default
+        salt '*' kubernetes.delete_endpoints name=my-nginx namespace=default
+    """
+    cfg = _setup_conn(**kwargs)
+
+    try:
+        api_instance = kubernetes.client.CoreV1Api()
+        api_response = api_instance.delete_namespaced_endpoints(
+            name=name,
+            namespace=namespace)
+
+        return api_response.to_dict()
+    except (ApiException, HTTPError) as exc:
+        if isinstance(exc, ApiException) and exc.status == 404:
+            return None
+        else:
+            log.exception(
+                "Exception when calling CoreV1Api->delete_namespaced_endpoints"
             )
             raise CommandExecutionError(exc)
     finally:
@@ -1184,6 +1270,45 @@ def create_namespace(name, **kwargs):
         _cleanup(**cfg)
 
 
+def create_endpoints(
+    name, namespace, metadata, subsets, source, template, saltenv, **kwargs
+):
+    """
+    Creates the kubernetes endpoints as defined by the user.
+    """
+    body = __create_object_body_with_subsets(
+        kind="Endpoints",
+        obj_class=kubernetes.client.V1Endpoints,
+        subsets_creator=__dict_to_endpoints_subsets,
+        name=name,
+        namespace=namespace,
+        metadata=metadata,
+        subsets=subsets,
+        source=source,
+        template=template,
+        saltenv=saltenv)
+
+    cfg = _setup_conn(**kwargs)
+
+    try:
+        api_instance = kubernetes.client.CoreV1Api()
+        api_response = api_instance.create_namespaced_endpoints(
+            namespace, body)
+
+        return api_response.to_dict()
+    except (ApiException, HTTPError) as exc:
+        if isinstance(exc, ApiException) and exc.status == 404:
+            return None
+        else:
+            log.exception(
+                "Exception when calling "
+                "CoreV1Api->create_namespaced_endpoints"
+            )
+            raise CommandExecutionError(exc)
+    finally:
+        _cleanup(**cfg)
+
+
 def replace_deployment(
     name, metadata, spec, source, template, saltenv, namespace="default", **kwargs
 ):
@@ -1380,6 +1505,51 @@ def replace_configmap(
         _cleanup(**cfg)
 
 
+def replace_endpoints(
+    name, metadata, subsets, source, template, old_endpoints, saltenv, namespace="default", **kwargs
+):
+    """
+    Replaces existing endpoints with new ones defined by name and namespace,
+    having the specificed metadata and subsets.
+    """
+    body = __create_object_body_with_subsets(
+        kind="Endpoints",
+        obj_class=kubernetes.client.V1Endpoints,
+        subsets_creator=__dict_to_endpoints_subsets,
+        name=name,
+        namespace=namespace,
+        metadata=metadata,
+        subsets=subsets,
+        source=source,
+        template=template,
+        saltenv=saltenv)
+
+    # Some attributes have to be preserved
+    # otherwise exceptions will be thrown
+    #body.spec.cluster_ip = old_endpoints["spec"]["cluster_ip"]
+    body.metadata.resource_version = old_endpoints["metadata"]["resource_version"]
+
+    cfg = _setup_conn(**kwargs)
+
+    try:
+        api_instance = kubernetes.client.CoreV1Api()
+        api_response = api_instance.replace_namespaced_endpoints(
+            name, namespace, body)
+
+        return api_response.to_dict()
+    except (ApiException, HTTPError) as exc:
+        if isinstance(exc, ApiException) and exc.status == 404:
+            return None
+        else:
+            log.exception(
+                "Exception when calling "
+                "CoreV1Api->replace_namespaced_endpoints"
+            )
+            raise CommandExecutionError(exc)
+    finally:
+        _cleanup(**cfg)
+
+
 def __create_object_body(
     kind,
     obj_class,
@@ -1415,6 +1585,40 @@ def __create_object_body(
         metadata=__dict_to_object_meta(name, namespace, metadata),
         spec=spec_creator(spec),
     )
+
+
+def __create_object_body_with_subsets(
+    kind,
+    obj_class,
+    subsets_creator,
+    name,
+    namespace,
+    metadata,
+    subsets,
+    source,
+    template,
+    saltenv):
+    """
+    Create a Kubernetes Object body instance with subsets.
+    """
+    if source:
+        src_obj = __read_and_render_yaml_file(source, template, saltenv)
+        if (
+                not isinstance(src_obj, dict) or
+                "kind" not in src_obj or
+                src_obj["kind"] != kind):
+            raise CommandExecutionError(
+                "The source file should define only "
+                "a {0} object".format(kind))
+
+        if "metadata" in src_obj:
+            metadata = src_obj["metadata"]
+        if "subsets" in src_obj:
+            subsets = src_obj["subsets"]
+
+    return obj_class(
+        metadata=__dict_to_object_meta(name, namespace, metadata),
+        subsets=subsets_creator(subsets))
 
 
 def __read_and_render_yaml_file(source, template, saltenv):
@@ -1534,6 +1738,30 @@ def __dict_to_service_spec(spec):
             setattr(spec_obj, key, value)
 
     return spec_obj
+
+
+def __dict_to_endpoints_subsets(subsets):
+    """
+    Converts a dictionary into kubernets V1Endpoints list
+    """
+    subset_objs = []
+    for subset_dict in subsets:
+
+        subset_obj = kubernetes.client.V1EndpointSubset()
+        for key, dict_array in iteritems(subset_dict):
+            if (hasattr(subset_obj, key)):
+                values = []
+                for value in dict_array:
+                    if "addresses" in key:
+                        values.append(kubernetes.client.V1EndpointAddress(**value))
+                    elif "ports" in key:
+                        values.append(kubernetes.client.V1EndpointPort(**value))
+
+                setattr(subset_obj, key, values)
+
+        subset_objs.append(subset_obj)
+
+    return subset_objs
 
 
 def __enforce_only_strings_dict(dictionary):
