@@ -622,6 +622,34 @@ def statefulsets(namespace='default', **kwargs):
         _cleanup(**cfg)
 
 
+def ingress(namespace='default', **kwargs):
+    '''
+    Return a list of kubernetes ingresses defined in the namespace
+
+    CLI Examples::
+
+        salt '*' kubernetes.ingress
+        salt '*' kubernetes.ingress namespace=default
+    '''
+    cfg = _setup_conn(**kwargs)
+    try:
+        api_instance = kubernetes.client.NetworkingV1beta1Api()
+        api_response = api_instance.list_namespaced_ingress(namespace)
+
+        return [secret['metadata']['name'] for secret in api_response.to_dict().get('items')]
+    except (ApiException, HTTPError) as exc:
+        if isinstance(exc, ApiException) and exc.status == 404:
+            return None
+        else:
+            log.exception(
+                'Exception when calling '
+                'NetworkingV1beta1Api->list_namespaced_ingress'
+            )
+            raise CommandExecutionError(exc)
+    finally:
+        _cleanup(**cfg)
+
+
 def show_deployment(name, namespace='default', **kwargs):
     '''
     Return the kubernetes deployment defined by name and namespace
@@ -851,6 +879,34 @@ def show_statefulset(name, namespace='default', **kwargs):
             log.exception(
                 'Exception when calling '
                 'AppsV1Api->read_namespaced_stateful_set'
+            )
+            raise CommandExecutionError(exc)
+    finally:
+        _cleanup(**cfg)
+
+
+def show_ingress(name, namespace='default', **kwargs):
+    '''
+    Return the kubernetes ingress defined by name and namespace
+
+    CLI Examples::
+
+        salt '*' kubernetes.show_ingress web-ingress default
+        salt '*' kubernetes.show_ingress name=web-ingress namespace=default
+    '''
+    cfg = _setup_conn(**kwargs)
+    try:
+        api_instance = kubernetes.client.NetworkingV1beta1Api()
+        api_response = api_instance.read_namespaced_ingress(name, namespace)
+
+        return api_response.to_dict()
+    except (ApiException, HTTPError) as exc:
+        if isinstance(exc, ApiException) and exc.status == 404:
+            return None
+        else:
+            log.exception(
+                'Exception when calling '
+                'NetworkingV1beta1Api->read_namespaced_ingress'
             )
             raise CommandExecutionError(exc)
     finally:
@@ -1126,6 +1182,39 @@ def delete_statefulset(name, namespace='default', **kwargs):
             log.exception(
                 'Exception when calling '
                 'AppsV1Api->delete_namespaced_stateful_set'
+            )
+            raise CommandExecutionError(exc)
+    finally:
+        _cleanup(**cfg)
+
+
+def delete_ingress(name, namespace='default', **kwargs):
+    '''
+    Deletes the kubernetes ingress defined by name and namespace
+
+    CLI Examples::
+
+        salt '*' kubernetes.delete_ingress web-ingress
+        salt '*' kubernetes.delete_ingress name=web-ingress namespace=default
+    '''
+    cfg = _setup_conn(**kwargs)
+    body = kubernetes.client.V1DeleteOptions(orphan_dependents=True)
+
+    try:
+        api_instance = kubernetes.client.NetworkingV1beta1Api()
+        api_response = api_instance.delete_namespaced_ingress(
+            name=name,
+            namespace=namespace,
+            body=body)
+
+        return api_response.to_dict()
+    except (ApiException, HTTPError) as exc:
+        if isinstance(exc, ApiException) and exc.status == 404:
+            return None
+        else:
+            log.exception(
+                'Exception when calling '
+                'NetworkingV1beta1Api->delete_namespaced_ingress'
             )
             raise CommandExecutionError(exc)
     finally:
@@ -1504,6 +1593,51 @@ def create_statefulset(
         _cleanup(**cfg)
 
 
+def create_ingress(
+        name,
+        namespace,
+        metadata,
+        spec,
+        source,
+        template,
+        saltenv,
+        **kwargs):
+    '''
+    Creates the kubernetes ingress as defined by the user.
+    '''
+    body = __create_object_body(
+        kind='Ingress',
+        obj_class=kubernetes.client.NetworkingV1beta1Ingress,
+        spec_creator=__dict_to_ingress_spec,
+        name=name,
+        namespace=namespace,
+        metadata=metadata,
+        spec=spec,
+        source=source,
+        template=template,
+        saltenv=saltenv)
+
+    cfg = _setup_conn(**kwargs)
+
+    try:
+        api_instance = kubernetes.client.NetworkingV1beta1Api()
+        api_response = api_instance.create_namespaced_ingress(
+            namespace, body)
+
+        return api_response.to_dict()
+    except (ApiException, HTTPError) as exc:
+        if isinstance(exc, ApiException) and exc.status == 404:
+            return None
+        else:
+            log.exception(
+                'Exception when calling '
+                'NetworkingV1beta1Api->create_namespaced_ingress'
+            )
+            raise CommandExecutionError(exc)
+    finally:
+        _cleanup(**cfg)
+
+
 def replace_deployment(name,
                        metadata,
                        spec,
@@ -1806,6 +1940,51 @@ def replace_statefulset(name,
         _cleanup(**cfg)
 
 
+def replace_ingress(name,
+                       metadata,
+                       spec,
+                       source,
+                       template,
+                       saltenv,
+                       namespace='default',
+                       **kwargs):
+    '''
+    Replaces an existing ingress with a new one defined by name and
+    namespace, having the specificed metadata and spec.
+    '''
+    body = __create_object_body(
+        kind='Ingress',
+        obj_class=kubernetes.client.NetworkingV1beta1Ingress,
+        spec_creator=__dict_to_ingress_spec,
+        name=name,
+        namespace=namespace,
+        metadata=metadata,
+        spec=spec,
+        source=source,
+        template=template,
+        saltenv=saltenv)
+
+    cfg = _setup_conn(**kwargs)
+
+    try:
+        api_instance = kubernetes.client.NetworkingV1beta1Api()
+        api_response = api_instance.replace_namespaced_ingress(
+            name, namespace, body)
+
+        return api_response.to_dict()
+    except (ApiException, HTTPError) as exc:
+        if isinstance(exc, ApiException) and exc.status == 404:
+            return None
+        else:
+            log.exception(
+                'Exception when calling '
+                'NetworkingV1beta1Api->replace_namespaced_ingress'
+            )
+            raise CommandExecutionError(exc)
+    finally:
+        _cleanup(**cfg)
+
+
 def __create_object_body(kind,
                          obj_class,
                          spec_creator,
@@ -2033,6 +2212,47 @@ def __dict_to_statefulset_spec(spec):
     spec_obj = kubernetes.client.V1StatefulSetSpec(selector=spec.get('selector', ''), service_name=spec.get('service_name', ''), template=spec.get('template', ''))
     for key, value in iteritems(spec):
         if hasattr(spec_obj, key):
+            setattr(spec_obj, key, value)
+
+    return spec_obj
+
+
+def __dict_to_ingress_spec(spec):
+    '''
+    Converts a dictionary into kubernetes NetworkingV1beta1IngressSpec instance.
+    '''
+    spec_obj = kubernetes.client.NetworkingV1beta1IngressSpec()
+    # Backend, Rules, TLS
+    for key, value in iteritems(spec):
+        if hasattr(spec_obj, key):
+            if 'backend' == key:
+                value = kubernetes.client.NetworkingV1beta1IngressBackend(service_name = value.get('serviceName', ''), service_port = value.get('servicePort', {}))
+            elif 'rules' == key:
+                rule_objs = []
+                for rule in value:
+                    rule_obj = kubernetes.client.NetworkingV1beta1IngressRule(host = rule.get('host', ''))
+                    rule_objs.append(rule_obj)
+
+                    path_objs = []
+                    paths = rule.get('http', {}).get('paths', [])
+                    for path in paths:
+                        backend = path.get('backend', {})
+                        path_obj = kubernetes.client.NetworkingV1beta1HTTPIngressPath(path = path.get('path', ''),
+                                backend = kubernetes.client.NetworkingV1beta1IngressBackend(service_name = backend.get('serviceName', ''), service_port = backend.get('servicePort', {})))
+                        path_objs.append(path_obj)
+
+                    rule_value_obj = kubernetes.client.NetworkingV1beta1HTTPIngressRuleValue(paths = path_objs)
+                    rule_obj.http = rule_value_obj
+
+                value = rule_objs
+            elif 'tls' == key:
+                tls_objs = []
+                for tls in value:
+                    tls_obj = kubernetes.client.NetworkingV1beta1IngressTLS(hosts = tls.get('hosts', []), secret_name = tls.get('secret_name', ''))
+                    tls_objs.append(tls_obj)
+
+                value = tls_objs
+
             setattr(spec_obj, key, value)
 
     return spec_obj
