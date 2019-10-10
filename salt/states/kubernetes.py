@@ -84,6 +84,7 @@ from __future__ import absolute_import
 
 import copy
 import logging
+import salt.utils.json
 
 # Import 3rd-party libs
 from salt.ext import six
@@ -153,6 +154,7 @@ def deployment_present(
     spec=None,
     source="",
     template="",
+    watch_configmaps=None,
     **kwargs
 ):
     """
@@ -179,6 +181,10 @@ def deployment_present(
 
     template
         Template engine to be used to render the source file.
+
+    watch_configmaps
+        List of configmaps to "watch" and update the deployment with an
+        annotation of the sha256 digest of the configmap contents
     """
     ret = {"name": name, "changes": {}, "result": False, "comment": ""}
 
@@ -194,6 +200,25 @@ def deployment_present(
         spec = {}
 
     deployment = __salt__["kubernetes.show_deployment"](name, namespace, **kwargs)
+
+    if watch_configmaps is not None:
+        if spec["template"] is None:
+            spec["template"] = {}
+
+        if "metadata" not in spec["template"]:
+            spec["template"]["metadata"] = {}
+
+        if "annotations" not in spec["template"]["metadata"]:
+            spec["template"]["metadata"]["annotations"] = {}
+
+        configmap_annotations = {}
+        for configmap_name in watch_configmaps:
+            configmap = __salt__["kubernetes.show_configmap"](configmap_name, namespace)
+            json = salt.utils.json.dumps(configmap, default=str)
+            digest = __salt__["hashutil.digest"](json, "sha256")
+            configmap_annotations["configmap/{0}".format(configmap_name)] = digest
+
+        spec["template"]["metadata"]["annotations"].update(configmap_annotations)
 
     if deployment is None:
         if __opts__["test"]:
