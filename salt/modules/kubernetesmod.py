@@ -1723,7 +1723,7 @@ def replace_configmap(
     name,
     data,
     source=None,
-    souces=None,
+    sources=None,
     template=None,
     saltenv="base",
     namespace="default",
