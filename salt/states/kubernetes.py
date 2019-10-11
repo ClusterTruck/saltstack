@@ -1446,3 +1446,138 @@ def ingress_present(
     }
     ret['result'] = True
     return ret
+
+
+def job_absent(name, namespace='default', **kwargs):
+    '''
+    Ensures that the named job is absent from the given namespace.
+
+    name
+        The name of the job
+
+    namespace
+        The name of the namespace
+    '''
+
+    ret = {'name': name,
+           'changes': {},
+           'result': False,
+           'comment': ''}
+
+    job = __salt__['kubernetes.show_job'](name, namespace, **kwargs)
+
+    if job is None:
+        ret['result'] = True if not __opts__['test'] else None
+        ret['comment'] = 'The job does not exist'
+        return ret
+
+    if __opts__['test']:
+        ret['comment'] = 'The job is going to be deleted'
+        ret['result'] = None
+        return ret
+
+    res = __salt__['kubernetes.delete_job'](name, namespace, **kwargs)
+    if res['code'] == 200 or res['code'] is None:
+        ret['result'] = True
+        ret['changes'] = {
+            'kubernetes.job': {
+                'new': 'absent', 'old': 'present'}}
+        ret['comment'] = res['message']
+    else:
+        ret['comment'] = 'Something went wrong, response: {0}'.format(res)
+
+    return ret
+
+def job_present(
+        name,
+        namespace='default',
+        metadata=None,
+        spec=None,
+        source='',
+        template='',
+        **kwargs):
+    '''
+    Ensures that the named job is present inside of the specified
+    namespace with the given metadata and spec.
+    If the job exists it will be replaced.
+
+    name
+        The name of the job.
+
+    namespace
+        The namespace holding the job. The 'default' one is going to be
+        used unless a different one is specified.
+
+    metadata
+        The metadata of the job object.
+
+    spec
+        The spec of the job object.
+
+    source
+        A file containing the definition of the job (metadata and
+        spec) in the official kubernetes format.
+
+    template
+        Template engine to be used to render the source file.
+    '''
+    ret = {'name': name,
+           'changes': {},
+           'result': False,
+           'comment': ''}
+
+    if (metadata or spec) and source:
+        return _error(
+            ret,
+            '\'source\' cannot be used in combination with \'metadata\' or '
+            '\'spec\''
+        )
+
+    if metadata is None:
+        metadata = {}
+
+    if spec is None:
+        spec = {}
+
+    job = __salt__['kubernetes.show_job'](name, namespace, **kwargs)
+
+    if job is None:
+        if __opts__['test']:
+            ret['result'] = None
+            ret['comment'] = 'The job is going to be created'
+            return ret
+        res = __salt__['kubernetes.create_job'](name=name,
+                                                namespace=namespace,
+                                                metadata=metadata,
+                                                spec=spec,
+                                                source=source,
+                                                template=template,
+                                                saltenv=__env__,
+                                                **kwargs)
+        ret['changes']['{0}.{1}'.format(namespace, name)] = {
+            'old': {},
+            'new': res}
+    else:
+        if __opts__['test']:
+            ret['result'] = None
+            return ret
+
+        # TODO: improve checks  # pylint: disable=fixme
+        log.info('Forcing the recreation of the job')
+        ret['comment'] = 'The job is already present. Forcing recreation'
+        res = __salt__['kubernetes.replace_job'](
+            name=name,
+            namespace=namespace,
+            metadata=metadata,
+            spec=spec,
+            source=source,
+            template=template,
+            saltenv=__env__,
+            **kwargs)
+
+    ret['changes'] = {
+        'metadata': metadata,
+        'spec': spec
+    }
+    ret['result'] = True
+    return ret

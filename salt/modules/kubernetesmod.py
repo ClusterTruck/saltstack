@@ -650,6 +650,34 @@ def ingress(namespace='default', **kwargs):
         _cleanup(**cfg)
 
 
+def jobs(namespace='default', **kwargs):
+    '''
+    Return a list of kubernetes jobs defined in the namespace
+
+    CLI Examples::
+
+        salt '*' kubernetes.jobs
+        salt '*' kubernetes.jobs namespace=default
+    '''
+    cfg = _setup_conn(**kwargs)
+    try:
+        api_instance = kubernetes.client.BatchV1Api()
+        api_response = api_instance.list_namespaced_job(namespace)
+
+        return [secret['metadata']['name'] for secret in api_response.to_dict().get('items')]
+    except (ApiException, HTTPError) as exc:
+        if isinstance(exc, ApiException) and exc.status == 404:
+            return None
+        else:
+            log.exception(
+                'Exception when calling '
+                'BatchV1Api->list_namespaced_job'
+            )
+            raise CommandExecutionError(exc)
+    finally:
+        _cleanup(**cfg)
+
+
 def show_deployment(name, namespace='default', **kwargs):
     '''
     Return the kubernetes deployment defined by name and namespace
@@ -907,6 +935,34 @@ def show_ingress(name, namespace='default', **kwargs):
             log.exception(
                 'Exception when calling '
                 'NetworkingV1beta1Api->read_namespaced_ingress'
+            )
+            raise CommandExecutionError(exc)
+    finally:
+        _cleanup(**cfg)
+
+
+def show_job(name, namespace='default', **kwargs):
+    '''
+    Return the kubernetes job defined by name and namespace
+
+    CLI Examples::
+
+        salt '*' kubernetes.show_job test-job default
+        salt '*' kubernetes.show_job name=test-job namespace=default
+    '''
+    cfg = _setup_conn(**kwargs)
+    try:
+        api_instance = kubernetes.client.BatchV1Api()
+        api_response = api_instance.read_namespaced_job(name, namespace)
+
+        return api_response.to_dict()
+    except (ApiException, HTTPError) as exc:
+        if isinstance(exc, ApiException) and exc.status == 404:
+            return None
+        else:
+            log.exception(
+                'Exception when calling '
+                'BatchV1Api->read_namespaced_job'
             )
             raise CommandExecutionError(exc)
     finally:
@@ -1215,6 +1271,39 @@ def delete_ingress(name, namespace='default', **kwargs):
             log.exception(
                 'Exception when calling '
                 'NetworkingV1beta1Api->delete_namespaced_ingress'
+            )
+            raise CommandExecutionError(exc)
+    finally:
+        _cleanup(**cfg)
+
+
+def delete_job(name, namespace='default', **kwargs):
+    '''
+    Deletes the kubernetes job defined by name and namespace
+
+    CLI Examples::
+
+        salt '*' kubernetes.delete_job test-job
+        salt '*' kubernetes.delete_job name=test-job namespace=default
+    '''
+    cfg = _setup_conn(**kwargs)
+    body = kubernetes.client.V1DeleteOptions(orphan_dependents=True)
+
+    try:
+        api_instance = kubernetes.client.BatchV1Api()
+        api_response = api_instance.delete_namespaced_job(
+            name=name,
+            namespace=namespace,
+            body=body)
+
+        return api_response.to_dict()
+    except (ApiException, HTTPError) as exc:
+        if isinstance(exc, ApiException) and exc.status == 404:
+            return None
+        else:
+            log.exception(
+                'Exception when calling '
+                'BatchV1Api->delete_namespaced_job'
             )
             raise CommandExecutionError(exc)
     finally:
@@ -1638,6 +1727,52 @@ def create_ingress(
         _cleanup(**cfg)
 
 
+def create_job(
+        name,
+        namespace,
+        metadata,
+        spec,
+        source,
+        template,
+        saltenv,
+        # TODO :WAIT
+        **kwargs):
+    '''
+    Creates the kubernetes job as defined by the user.
+    '''
+    body = __create_object_body(
+        kind='Job',
+        obj_class=kubernetes.client.V1Job,
+        spec_creator=__dict_to_job_spec,
+        name=name,
+        namespace=namespace,
+        metadata=metadata,
+        spec=spec,
+        source=source,
+        template=template,
+        saltenv=saltenv)
+
+    cfg = _setup_conn(**kwargs)
+
+    try:
+        api_instance = kubernetes.client.BatchV1Api()
+        api_response = api_instance.create_namespaced_job(
+            namespace, body)
+
+        return api_response.to_dict()
+    except (ApiException, HTTPError) as exc:
+        if isinstance(exc, ApiException) and exc.status == 404:
+            return None
+        else:
+            log.exception(
+                'Exception when calling '
+                'BatchV1Api->create_namespaced_job'
+            )
+            raise CommandExecutionError(exc)
+    finally:
+        _cleanup(**cfg)
+
+
 def replace_deployment(name,
                        metadata,
                        spec,
@@ -1985,6 +2120,51 @@ def replace_ingress(name,
         _cleanup(**cfg)
 
 
+def replace_job(name,
+                metadata,
+                spec,
+                source,
+                template,
+                saltenv,
+                namespace='default',
+                **kwargs):
+    '''
+    Replaces an existing job with a new one defined by name and
+    namespace, having the specificed metadata and spec.
+    '''
+    body = __create_object_body(
+        kind='Job',
+        obj_class=kubernetes.client.V1Job,
+        spec_creator=__dict_to_job_spec,
+        name=name,
+        namespace=namespace,
+        metadata=metadata,
+        spec=spec,
+        source=source,
+        template=template,
+        saltenv=saltenv)
+
+    cfg = _setup_conn(**kwargs)
+
+    try:
+        api_instance = kubernetes.client.BatchV1Api()
+        api_response = api_instance.replace_namespaced_job(
+            name, namespace, body)
+
+        return api_response.to_dict()
+    except (ApiException, HTTPError) as exc:
+        if isinstance(exc, ApiException) and exc.status == 404:
+            return None
+        else:
+            log.exception(
+                'Exception when calling '
+                'BatchV1Api->replace_namespaced_job'
+            )
+            raise CommandExecutionError(exc)
+    finally:
+        _cleanup(**cfg)
+
+
 def __create_object_body(kind,
                          obj_class,
                          spec_creator,
@@ -2253,6 +2433,18 @@ def __dict_to_ingress_spec(spec):
 
                 value = tls_objs
 
+            setattr(spec_obj, key, value)
+
+    return spec_obj
+
+
+def __dict_to_job_spec(spec):
+    '''
+    Converts a dictionary into a kubernetes V1JobSpec instance.
+    '''
+    spec_obj = kubernetes.client.V1JobSpec(template=spec.get('template', ''))
+    for key, value in iteritems(spec):
+        if hasattr(spec_obj, key):
             setattr(spec_obj, key, value)
 
     return spec_obj
