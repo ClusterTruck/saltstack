@@ -1450,22 +1450,9 @@ def job_present(
             "old": {},
             "new": res}
     else:
-        if __opts__["test"]:
-            ret["result"] = None
-            return ret
-
-        # TODO: improve checks  # pylint: disable=fixme
-        log.info("Forcing the recreation of the job")
-        ret["comment"] = "The job is already present. Forcing recreation"
-        res = __salt__["kubernetes.replace_job"](
-            name=name,
-            namespace=namespace,
-            metadata=metadata,
-            spec=spec,
-            source=source,
-            template=template,
-            saltenv=__env__,
-            **kwargs)
+        ret["comment"] = "The job is already present. Job replacement is currently not supported; it must be deleted and recreated."
+        ret["result"] = None
+        return ret
 
     ret["changes"] = {
         "metadata": metadata,
