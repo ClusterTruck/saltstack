@@ -85,6 +85,7 @@ from __future__ import absolute_import
 import copy
 import logging
 import salt.utils.json
+from time import time, sleep
 
 # Import 3rd-party libs
 from salt.ext import six
@@ -1495,6 +1496,8 @@ def job_present(
         spec=None,
         source='',
         template='',
+        wait_until_complete=False,
+        wait_timeout_seconds=600,
         **kwargs):
     '''
     Ensures that the named job is present inside of the specified
@@ -1520,6 +1523,14 @@ def job_present(
 
     template
         Template engine to be used to render the source file.
+
+    wait_until_complete
+        True to wait to return from state until job is complete. Defaults
+        to false
+
+    wait_timeout_seconds
+        The number of seconds after which to time out on waiting. Defaults
+        to 600 (10 minutes).
     '''
     ret = {'name': name,
            'changes': {},
@@ -1579,5 +1590,25 @@ def job_present(
         'metadata': metadata,
         'spec': spec
     }
+
+    if wait_until_complete:
+        starttime = time()
+        while True:
+            sleep(5)
+            job = __salt__['kubernetes.show_job'](name, namespace, **kwargs)
+
+            if job is None:
+                ret['comment'] = 'Something went wrong, job not found while waiting for completion'
+                return ret
+
+            if job['status']['failed'] is not None or job['status']['succeeded'] is not None:
+                ret['comment'] = 'Job Completed'
+                break
+            else:
+                if time() - starttime > wait_timeout_seconds:
+                    ret['comment'] = 'Job still running after timeout. Status {0}'.format(job['status'])
+                    ret['result'] = False
+                    return ret
+
     ret['result'] = True
     return ret
