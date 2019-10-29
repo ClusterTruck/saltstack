@@ -537,6 +537,7 @@ def secret_present(
         data=None,
         source=None,
         template=None,
+        type=None,
         **kwargs):
     '''
     Ensures that the named secret is present inside of the specified namespace
@@ -555,6 +556,9 @@ def secret_present(
 
     source
         A file containing the data of the secret in plain format.
+
+    type
+        The type of the secret that should be present.
 
     template
         Template engine to be used to render the source file.
@@ -585,6 +589,7 @@ def secret_present(
                                                    data=data,
                                                    source=source,
                                                    template=template,
+                                                   secrettype=type,
                                                    saltenv=__env__,
                                                    **kwargs)
         ret['changes']['{0}.{1}'.format(namespace, name)] = {
@@ -605,6 +610,7 @@ def secret_present(
             data=data,
             source=source,
             template=template,
+            secrettype=type,
             saltenv=__env__,
             **kwargs)
 
