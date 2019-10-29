@@ -495,7 +495,7 @@ def secret_absent(name, namespace="default", **kwargs):
 
 
 def secret_present(
-    name, namespace="default", data=None, source=None, template=None, **kwargs
+    name, namespace="default", data=None, source=None, template=None, type=None, **kwargs
 ):
     """
     Ensures that the named secret is present inside of the specified namespace
@@ -514,6 +514,9 @@ def secret_present(
 
     source
         A file containing the data of the secret in plain format.
+
+    type
+        The type of the secret that should be present.
 
     template
         Template engine to be used to render the source file.
@@ -539,6 +542,7 @@ def secret_present(
             data=data,
             source=source,
             template=template,
+            secrettype=type,
             saltenv=__env__,
             **kwargs
         )
@@ -558,6 +562,7 @@ def secret_present(
             data=data,
             source=source,
             template=template,
+            secrettype=type,
             saltenv=__env__,
             **kwargs
         )

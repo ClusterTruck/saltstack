@@ -1407,6 +1407,7 @@ def create_secret(
     data=None,
     source=None,
     template=None,
+    secrettype=None,
     saltenv="base",
     **kwargs
 ):
@@ -1433,7 +1434,7 @@ def create_secret(
         data[key] = str(base64.b64encode(data[key].encode('utf-8')), 'utf-8')
 
     body = kubernetes.client.V1Secret(
-        metadata=__dict_to_object_meta(name, namespace, {}), data=data
+        metadata=__dict_to_object_meta(name, namespace, {}), data=data, type=secrettype
     )
 
     cfg = _setup_conn(**kwargs)
@@ -1788,6 +1789,7 @@ def replace_secret(
     data,
     source=None,
     template=None,
+    secrettype=None,
     saltenv="base",
     namespace="default",
     **kwargs
@@ -1816,7 +1818,7 @@ def replace_secret(
         data[key] = str(base64.b64encode(data[key].encode('utf-8')), 'utf-8')
 
     body = kubernetes.client.V1Secret(
-        metadata=__dict_to_object_meta(name, namespace, {}), data=data
+        metadata=__dict_to_object_meta(name, namespace, {}), data=data, type=secrettype
     )
 
     cfg = _setup_conn(**kwargs)
