@@ -84,6 +84,7 @@ from __future__ import absolute_import
 
 import copy
 import logging
+import json
 import salt.utils.json
 from time import time, sleep
 
@@ -340,11 +341,41 @@ def service_present(
             'old': {},
             'new': res}
     else:
+        # Run dry run to compute diff
+        res = __salt__['kubernetes.replace_service'](
+            name=name,
+            namespace=namespace,
+            metadata=metadata,
+            spec=spec,
+            source=source,
+            template=template,
+            old_service=service,
+            saltenv=__env__,
+            dry_run=True,
+            **kwargs)
+
+        # Special case for services, for diff computing purposes. Because
+        # the NodePort value changes every time if we don't specify one,
+        # set the service value to the one from the result unless it was
+        # specified. This will ensure that our diff is clean
+        if 'ports' in spec:
+          port_count = len(spec['ports'])
+          for idx in range(port_count):
+              if 'node_port' not in spec['ports'][idx] and idx < len(service['spec']['ports']):
+                  service['spec']['ports'][idx]['node_port'] = res['spec']['ports'][idx]['node_port']
+
+        changes = __obj_definition_diff(service, res, ignore_keys=['kubernetes.io/change-cause'])
+
+        # If there are no changes, there are no changes
+        if not changes:
+            ret['result'] = True
+            return ret
+
+        ret['changes']['{0}.{1}'.format(namespace, name)] = changes
         if __opts__['test']:
             ret['result'] = None
             return ret
 
-        # TODO: improve checks  # pylint: disable=fixme
         log.info('Forcing the recreation of the service')
         ret['comment'] = 'The service is already present. Forcing recreation'
         res = __salt__['kubernetes.replace_service'](
@@ -358,12 +389,19 @@ def service_present(
             saltenv=__env__,
             **kwargs)
 
-    ret['changes'] = {
-        'metadata': metadata,
-        'spec': spec
-    }
+        changes = __obj_definition_diff(service, res)
+        ret['changes']['{0}.{1}'.format(namespace, name)] = changes
+
     ret['result'] = True
     return ret
+
+
+def __obj_definition_diff(old, new, ignore_keys=[]):
+    '''
+    Diffs two kubernetes object defintions deeply using salt's dictdiffer and some additonal logic
+    '''
+    diff = salt.utils.dictdiffer.recursive_diff(old, new, diff_lists=True, ignore_keys=ignore_keys)
+    return diff.diffs
 
 
 def service_absent(name, namespace='default', **kwargs):

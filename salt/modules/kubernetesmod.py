@@ -1854,8 +1854,10 @@ def replace_service(name,
 
     try:
         api_instance = kubernetes.client.CoreV1Api()
+        svc_kwargs = {}
+        if __opts__['test'] or kwargs.get('dry_run'): svc_kwargs['dry_run'] = 'All'
         api_response = api_instance.replace_namespaced_service(
-            name, namespace, body)
+            name, namespace, body, **svc_kwargs)
 
         return api_response.to_dict()
     except (ApiException, HTTPError) as exc:
