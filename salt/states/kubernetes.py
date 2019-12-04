@@ -246,11 +246,30 @@ def deployment_present(
             'old': {},
             'new': res}
     else:
+        # Dry run to compute diff
+        res = __salt__['kubernetes.replace_deployment'](
+            name=name,
+            namespace=namespace,
+            metadata=metadata,
+            spec=spec,
+            source=source,
+            template=template,
+            saltenv=__env__,
+            dry_run=True,
+            **kwargs)
+
+        changes = __obj_definition_diff(__translate_deployment_env(deployment), __translate_deployment_env(res), ignore_keys=['kubernetes.io/change-cause', 'generation', 'resource_version'])
+
+        # If there are no changes, there are no changes
+        if not changes:
+            ret['result'] = True
+            return ret
+
+        ret['changes']['{0}.{1}'.format(namespace, name)] = changes
         if __opts__['test']:
             ret['result'] = None
             return ret
 
-        # TODO: improve checks  # pylint: disable=fixme
         log.info('Forcing the recreation of the deployment')
         ret['comment'] = 'The deployment is already present. Forcing recreation'
         res = __salt__['kubernetes.replace_deployment'](
@@ -263,12 +282,36 @@ def deployment_present(
             saltenv=__env__,
             **kwargs)
 
-    ret['changes'] = {
-        'metadata': metadata,
-        'spec': spec
-    }
+        changes = __obj_definition_diff(deployment, __translate_deployment_env(res))
+        ret['changes']['{0}.{1}'.format(namespace, name)] = changes
+
     ret['result'] = True
     return ret
+
+
+def __translate_deployment_env(deployment):
+    '''
+    Helper to translate a deployment's ENV to key/values for better diffing
+    '''
+
+    containers = deployment.get('spec', {}) \
+                           .get('template', {}) \
+                           .get('spec', {}) \
+                           .get('containers', [])
+
+    if len(containers) == 0: return deployment
+
+    env = containers[0].get('env', [])
+
+    if len(env) == 0: return deployment
+
+    new_env = {}
+    for e in env:
+        new_env[e['name']] = e['value']
+
+    deployment['spec']['template']['spec']['containers'][0]['env'] = new_env
+
+    return deployment
 
 
 def service_present(
