@@ -299,11 +299,11 @@ def __translate_deployment_env(deployment):
                            .get('spec', {}) \
                            .get('containers', [])
 
-    if len(containers) == 0: return deployment
+    if containers is None or len(containers) == 0: return deployment
 
     env = containers[0].get('env', [])
 
-    if len(env) == 0: return deployment
+    if env is None or len(env) == 0: return deployment
 
     new_env = {}
     for e in env:
@@ -677,12 +677,31 @@ def secret_present(
             'old': {},
             'new': res}
     else:
+        # Dry run to compute diff
+        res = __salt__['kubernetes.replace_secret'](
+            name=name,
+            namespace=namespace,
+            data=data,
+            source=source,
+            template=template,
+            secrettype=type,
+            saltenv=__env__,
+            dry_run=True,
+            **kwargs)
+
+        changes = __obj_definition_diff(secret, res, ignore_keys=['kubernetes.io/change-cause'])
+
+        # If there are no changes, there are no changes
+        if not changes:
+            ret['result'] = True
+            return ret
+
+        ret['changes']['{0}.{1}'.format(namespace, name)] = changes
         if __opts__['test']:
             ret['result'] = None
             ret['comment'] = 'The secret is going to be replaced'
             return ret
 
-        # TODO: improve checks  # pylint: disable=fixme
         log.info('Forcing the recreation of the service')
         ret['comment'] = 'The secret is already present. Forcing recreation'
         res = __salt__['kubernetes.replace_secret'](
@@ -695,11 +714,10 @@ def secret_present(
             saltenv=__env__,
             **kwargs)
 
-    ret['changes'] = {
-        # Omit values from the return. They are unencrypted
-        # and can contain sensitive data.
-        'data': list(res['data'])
-    }
+        # TODO: Hide data value changes because secret
+        changes = __obj_definition_diff(secret, res)
+        ret['changes']['{0}.{1}'.format(namespace, name)] = changes
+
     ret['result'] = True
 
     return ret
@@ -813,13 +831,32 @@ def configmap_present(
             'old': {},
             'new': res}
     else:
+        # Dry run to compute diff
+        res = __salt__['kubernetes.replace_configmap'](
+            name=name,
+            namespace=namespace,
+            data=data,
+            source=source,
+            sources=sources,
+            template=template,
+            saltenv=__env__,
+            dry_run=True,
+            **kwargs)
+
+        changes = __obj_definition_diff(configmap, res, ignore_keys=['kubernetes.io/change-cause'])
+
+        # If there are no changes, there are no changes
+        if not changes:
+            ret['result'] = True
+            return ret
+
+        ret['changes']['{0}.{1}'.format(configmap, name)] = changes
         if __opts__['test']:
             ret['result'] = None
             ret['comment'] = 'The configmap is going to be replaced'
             return ret
 
-        # TODO: improve checks  # pylint: disable=fixme
-        log.info('Forcing the recreation of the service')
+        log.info('Forcing the recreation of the configmap')
         ret['comment'] = 'The configmap is already present. Forcing recreation'
         res = __salt__['kubernetes.replace_configmap'](
             name=name,
@@ -831,9 +868,9 @@ def configmap_present(
             saltenv=__env__,
             **kwargs)
 
-    ret['changes'] = {
-        'data': res['data']
-    }
+        changes = __obj_definition_diff(configmap, res)
+        ret['changes']['{0}.{1}'.format(namespace, name)] = changes
+
     ret['result'] = True
     return ret
 
@@ -1240,11 +1277,31 @@ def endpoints_present(
             'old': {},
             'new': res}
     else:
+        # Dry run to compute diff
+        res = __salt__['kubernetes.replace_endpoints'](
+            name=name,
+            namespace=namespace,
+            metadata=metadata,
+            spec=spec,
+            source=source,
+            template=template,
+            old_endpoints=endpoints,
+            saltenv=__env__,
+            dry_run=True,
+            **kwargs)
+
+        changes = __obj_definition_diff(endpoints, res, ignore_keys=['kubernetes.io/change-cause'])
+
+        # If there are no changes, there are no changes
+        if not changes:
+            ret['result'] = True
+            return ret
+
+        ret['changes']['{0}.{1}'.format(namespace, name)] = changes
         if __opts__['test']:
             ret['result'] = None
             return ret
 
-        # TODO: improve checks  # pylint: disable=fixme
         log.info('Forcing the recreation of the endpoints')
         ret['comment'] = 'The endpoints are already present. Forcing recreation'
         res = __salt__['kubernetes.replace_endpoints'](
@@ -1258,10 +1315,9 @@ def endpoints_present(
             saltenv=__env__,
             **kwargs)
 
-    ret['changes'] = {
-        'metadata': metadata,
-        'spec': spec
-    }
+        changes = __obj_definition_diff(endpoints, res)
+        ret['changes']['{0}.{1}'.format(namespace, name)] = changes
+
     ret['result'] = True
     return ret
 
@@ -1376,11 +1432,30 @@ def statefulset_present(
             'old': {},
             'new': res}
     else:
+        # Dry run to compute diff
+        res = __salt__['kubernetes.replace_statefulset'](
+            name=name,
+            namespace=namespace,
+            metadata=metadata,
+            spec=spec,
+            source=source,
+            template=template,
+            saltenv=__env__,
+            dry_run=True,
+            **kwargs)
+
+        changes = __obj_definition_diff(stateful_set, res, ignore_keys=['kubernetes.io/change-cause'])
+
+        # If there are no changes, there are no changes
+        if not changes:
+            ret['result'] = True
+            return ret
+
+        ret['changes']['{0}.{1}'.format(namespace, name)] = changes
         if __opts__['test']:
             ret['result'] = None
             return ret
 
-        # TODO: improve checks  # pylint: disable=fixme
         log.info('Forcing the recreation of the stateful set')
         ret['comment'] = 'The stateful set is already present. Forcing recreation'
         res = __salt__['kubernetes.replace_statefulset'](
@@ -1393,10 +1468,9 @@ def statefulset_present(
             saltenv=__env__,
             **kwargs)
 
-    ret['changes'] = {
-        'metadata': metadata,
-        'spec': spec
-    }
+        changes = __obj_definition_diff(stateful_set, res)
+        ret['changes']['{0}.{1}'.format(namespace, name)] = changes
+
     ret['result'] = True
     return ret
 
@@ -1511,11 +1585,30 @@ def ingress_present(
             'old': {},
             'new': res}
     else:
+        # Dry run to compute diff
+        res = __salt__['kubernetes.replace_ingress'](
+            name=name,
+            namespace=namespace,
+            metadata=metadata,
+            spec=spec,
+            source=source,
+            template=template,
+            saltenv=__env__,
+            dry_run=True,
+            **kwargs)
+
+        changes = __obj_definition_diff(ingress, res, ignore_keys=['kubernetes.io/change-cause'])
+
+        # If there are no changes, there are no changes
+        if not changes:
+            ret['result'] = True
+            return ret
+
+        ret['changes']['{0}.{1}'.format(namespace, name)] = changes
         if __opts__['test']:
             ret['result'] = None
             return ret
 
-        # TODO: improve checks  # pylint: disable=fixme
         log.info('Forcing the recreation of the ingress')
         ret['comment'] = 'The ingress is already present. Forcing recreation'
         res = __salt__['kubernetes.replace_ingress'](
@@ -1528,10 +1621,9 @@ def ingress_present(
             saltenv=__env__,
             **kwargs)
 
-    ret['changes'] = {
-        'metadata': metadata,
-        'spec': spec
-    }
+        changes = __obj_definition_diff(ingress, res)
+        ret['changes']['{0}.{1}'.format(namespace, name)] = changes
+
     ret['result'] = True
     return ret
 

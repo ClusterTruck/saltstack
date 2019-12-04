@@ -1915,8 +1915,10 @@ def replace_secret(name,
 
     try:
         api_instance = kubernetes.client.CoreV1Api()
+        svc_kwargs = {}
+        if __opts__['test'] or kwargs.get('dry_run'): svc_kwargs['dry_run'] = 'All'
         api_response = api_instance.replace_namespaced_secret(
-            name, namespace, body)
+            name, namespace, body, **svc_kwargs)
 
         return api_response.to_dict()
     except (ApiException, HTTPError) as exc:
@@ -1970,8 +1972,10 @@ def replace_configmap(name,
 
     try:
         api_instance = kubernetes.client.CoreV1Api()
+        svc_kwargs = {}
+        if __opts__['test'] or kwargs.get('dry_run'): svc_kwargs['dry_run'] = 'All'
         api_response = api_instance.replace_namespaced_config_map(
-            name, namespace, body)
+            name, namespace, body, **svc_kwargs)
 
         return api_response.to_dict()
     except (ApiException, HTTPError) as exc:
@@ -2021,8 +2025,10 @@ def replace_endpoints(name,
 
     try:
         api_instance = kubernetes.client.CoreV1Api()
+        svc_kwargs = {}
+        if __opts__['test'] or kwargs.get('dry_run'): svc_kwargs['dry_run'] = 'All'
         api_response = api_instance.replace_namespaced_endpoints(
-            name, namespace, body)
+            name, namespace, body, **svc_kwargs)
 
         return api_response.to_dict()
     except (ApiException, HTTPError) as exc:
@@ -2066,8 +2072,10 @@ def replace_statefulset(name,
 
     try:
         api_instance = kubernetes.client.AppsV1Api()
+        svc_kwargs = {}
+        if __opts__['test'] or kwargs.get('dry_run'): svc_kwargs['dry_run'] = 'All'
         api_response = api_instance.replace_namespaced_stateful_set(
-            name, namespace, body)
+            name, namespace, body, **svc_kwargs)
 
         return api_response.to_dict()
     except (ApiException, HTTPError) as exc:
@@ -2111,8 +2119,10 @@ def replace_ingress(name,
 
     try:
         api_instance = kubernetes.client.NetworkingV1beta1Api()
+        svc_kwargs = {}
+        if __opts__['test'] or kwargs.get('dry_run'): svc_kwargs['dry_run'] = 'All'
         api_response = api_instance.replace_namespaced_ingress(
-            name, namespace, body)
+            name, namespace, body, **svc_kwargs)
 
         return api_response.to_dict()
     except (ApiException, HTTPError) as exc:
