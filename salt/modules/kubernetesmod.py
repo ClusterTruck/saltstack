@@ -1716,7 +1716,9 @@ def replace_deployment(
 
     try:
         api_instance = kubernetes.client.AppsV1Api()
-        api_response = api_instance.replace_namespaced_deployment(name, namespace, body)
+        svc_kwargs = {}
+        if __opts__["test"] or kwargs.get("dry_run"): svc_kwargs["dry_run"] = "All"
+        api_response = api_instance.replace_namespaced_deployment(name, namespace, body, **svc_kwargs)
 
         return api_response.to_dict()
     except (ApiException, HTTPError) as exc:
@@ -1769,7 +1771,9 @@ def replace_service(
 
     try:
         api_instance = kubernetes.client.CoreV1Api()
-        api_response = api_instance.replace_namespaced_service(name, namespace, body)
+        svc_kwargs = {}
+        if __opts__["test"] or kwargs.get("dry_run"): svc_kwargs["dry_run"] = "All"
+        api_response = api_instance.replace_namespaced_service(name, namespace, body, **svc_kwargs)
 
         return api_response.to_dict()
     except (ApiException, HTTPError) as exc:
@@ -1825,7 +1829,9 @@ def replace_secret(
 
     try:
         api_instance = kubernetes.client.CoreV1Api()
-        api_response = api_instance.replace_namespaced_secret(name, namespace, body)
+        svc_kwargs = {}
+        if __opts__["test"] or kwargs.get("dry_run"): svc_kwargs["dry_run"] = "All"
+        api_response = api_instance.replace_namespaced_secret(name, namespace, body, **svc_kwargs)
 
         return api_response.to_dict()
     except (ApiException, HTTPError) as exc:
@@ -1880,7 +1886,9 @@ def replace_configmap(
 
     try:
         api_instance = kubernetes.client.CoreV1Api()
-        api_response = api_instance.replace_namespaced_config_map(name, namespace, body)
+        svc_kwargs = {}
+        if __opts__["test"] or kwargs.get("dry_run"): svc_kwargs["dry_run"] = "All"
+        api_response = api_instance.replace_namespaced_config_map(name, namespace, body, **svc_kwargs)
 
         return api_response.to_dict()
     except (ApiException, HTTPError) as exc:
@@ -1923,8 +1931,9 @@ def replace_endpoints(
 
     try:
         api_instance = kubernetes.client.CoreV1Api()
-        api_response = api_instance.replace_namespaced_endpoints(
-            name, namespace, body)
+        svc_kwargs = {}
+        if __opts__["test"] or kwargs.get("dry_run"): svc_kwargs["dry_run"] = "All"
+        api_response = api_instance.replace_namespaced_endpoints( name, namespace, body, **svc_kwargs)
 
         return api_response.to_dict()
     except (ApiException, HTTPError) as exc:
@@ -1963,8 +1972,9 @@ def replace_statefulset(
 
     try:
         api_instance = kubernetes.client.AppsV1Api()
-        api_response = api_instance.replace_namespaced_stateful_set(
-            name, namespace, body)
+        svc_kwargs = {}
+        if __opts__["test"] or kwargs.get("dry_run"): svc_kwargs["dry_run"] = "All"
+        api_response = api_instance.replace_namespaced_stateful_set( name, namespace, body, **svc_kwargs)
 
         return api_response.to_dict()
     except (ApiException, HTTPError) as exc:
@@ -2009,8 +2019,9 @@ def replace_ingress(
 
     try:
         api_instance = kubernetes.client.NetworkingV1beta1Api()
-        api_response = api_instance.replace_namespaced_ingress(
-            name, namespace, body)
+        svc_kwargs = {}
+        if __opts__["test"] or kwargs.get("dry_run"): svc_kwargs["dry_run"] = "All"
+        api_response = api_instance.replace_namespaced_ingress( name, namespace, body, **svc_kwargs)
 
         return api_response.to_dict()
     except (ApiException, HTTPError) as exc:
