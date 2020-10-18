@@ -87,7 +87,7 @@ def deep_diff(old, new, ignore=None):
     return res
 
 
-def recursive_diff(past_dict, current_dict, ignore_missing_keys=True, diff_lists=False):
+def recursive_diff(past_dict, current_dict, ignore_missing_keys=True, diff_lists=False, ignore_keys = None):
     """
     Returns a RecursiveDictDiffer object that computes the recursive diffs
     between two dictionaries
@@ -110,8 +110,12 @@ def recursive_diff(past_dict, current_dict, ignore_missing_keys=True, diff_lists
         diffed in order and their diffs will be added as lists under the
         matching key.
         Default is False.
+
+    ignore_keys
+        Specify keys to be ignored when checking diffs.
+        Default is None
     """
-    return RecursiveDictDiffer(past_dict, current_dict, ignore_missing_keys, diff_lists)
+    return RecursiveDictDiffer(past_dict, current_dict, ignore_missing_keys, diff_lists, ignore_keys)
 
 
 class RecursiveDictDiffer(DictDiffer):
@@ -157,7 +161,7 @@ class RecursiveDictDiffer(DictDiffer):
 
     NONE_VALUE = "<_null_>"
 
-    def __init__(self, past_dict, current_dict, ignore_missing_keys, diff_lists):
+    def __init__(self, past_dict, current_dict, ignore_missing_keys, diff_lists, ignore_keys):
         """
         past_dict
             Past dictionary.
@@ -175,16 +179,19 @@ class RecursiveDictDiffer(DictDiffer):
             that are of list type. If True, list elements will be recursively
             diffed in order and their diffs will be added as lists under the
             matching key.
+
+        ignore_keys
+            Specify keys to be ignored when checking diffs.
         """
         super(RecursiveDictDiffer, self).__init__(current_dict, past_dict)
         self._diffs = self._get_diffs(
-            self.current_dict, self.past_dict, ignore_missing_keys, diff_lists
+            self.current_dict, self.past_dict, ignore_missing_keys, diff_lists, ignore_keys
         )
         # Ignores unet values when assessing the changes
         self.ignore_unset_values = True
 
     @classmethod
-    def _get_diffs(cls, dict1, dict2, ignore_missing_keys, diff_lists):
+    def _get_diffs(cls, dict1, dict2, ignore_missing_keys, diff_lists, ignore_keys):
         """
         Returns a dict with the differences between dict1 and dict2
 
@@ -193,14 +200,19 @@ class RecursiveDictDiffer(DictDiffer):
             ignore_missing_keys is True, otherwise they are
             Simple compares are done on lists
         """
+        if ignore_keys is None: ignore_keys = []
+
         ret_dict = {}
         for p in dict1.keys():
+            if p in ignore_keys:
+                continue
+
             if p not in dict2:
                 ret_dict.update({p: {"new": dict1[p], "old": cls.NONE_VALUE}})
             elif dict1[p] != dict2[p]:
                 if isinstance(dict1[p], dict) and isinstance(dict2[p], dict):
                     sub_diff_dict = cls._get_diffs(
-                        dict1[p], dict2[p], ignore_missing_keys, diff_lists
+                        dict1[p], dict2[p], ignore_missing_keys, diff_lists, ignore_keys
                     )
                     if sub_diff_dict:
                         ret_dict.update({p: sub_diff_dict})
@@ -215,7 +227,7 @@ class RecursiveDictDiffer(DictDiffer):
                         idx_diff = {}
                         if idx < len1 and idx < len2:
                             idx_diff = cls._get_diffs(dict1[p][idx], dict2[p][idx],
-                                                           ignore_missing_keys, diff_lists)
+                                                           ignore_missing_keys, diff_lists, ignore_keys)
                         elif idx < len1:
                             idx_diff = {"new": dict1[p][idx], "old": cls.NONE_VALUE}
                         else:
