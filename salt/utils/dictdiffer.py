@@ -87,7 +87,7 @@ def deep_diff(old, new, ignore=None):
     return res
 
 
-def recursive_diff(past_dict, current_dict, ignore_missing_keys=True):
+def recursive_diff(past_dict, current_dict, ignore_missing_keys=True, diff_lists=False):
     """
     Returns a RecursiveDictDiffer object that computes the recursive diffs
     between two dictionaries
@@ -103,8 +103,15 @@ def recursive_diff(past_dict, current_dict, ignore_missing_keys=True):
         current_dict, but exist in the past_dict. If true, the diff will
         not contain the missing keys.
         Default is True.
+
+    diff_lists
+        Flag specifying whether to recurse inside of dictionary elements
+        that are of list type. If True, list elements will be recursively
+        diffed in order and their diffs will be added as lists under the
+        matching key.
+        Default is False.
     """
-    return RecursiveDictDiffer(past_dict, current_dict, ignore_missing_keys)
+    return RecursiveDictDiffer(past_dict, current_dict, ignore_missing_keys, diff_lists)
 
 
 class RecursiveDictDiffer(DictDiffer):
@@ -150,7 +157,7 @@ class RecursiveDictDiffer(DictDiffer):
 
     NONE_VALUE = "<_null_>"
 
-    def __init__(self, past_dict, current_dict, ignore_missing_keys):
+    def __init__(self, past_dict, current_dict, ignore_missing_keys, diff_lists):
         """
         past_dict
             Past dictionary.
@@ -162,16 +169,22 @@ class RecursiveDictDiffer(DictDiffer):
             Flag specifying whether to ignore keys that no longer exist in the
             current_dict, but exist in the past_dict. If true, the diff will
             not contain the missing keys.
+
+        diff_lists
+            Flag specifying whether to recurse inside of dictionary elements
+            that are of list type. If True, list elements will be recursively
+            diffed in order and their diffs will be added as lists under the
+            matching key.
         """
         super(RecursiveDictDiffer, self).__init__(current_dict, past_dict)
         self._diffs = self._get_diffs(
-            self.current_dict, self.past_dict, ignore_missing_keys
+            self.current_dict, self.past_dict, ignore_missing_keys, diff_lists
         )
         # Ignores unet values when assessing the changes
         self.ignore_unset_values = True
 
     @classmethod
-    def _get_diffs(cls, dict1, dict2, ignore_missing_keys):
+    def _get_diffs(cls, dict1, dict2, ignore_missing_keys, diff_lists):
         """
         Returns a dict with the differences between dict1 and dict2
 
@@ -187,10 +200,33 @@ class RecursiveDictDiffer(DictDiffer):
             elif dict1[p] != dict2[p]:
                 if isinstance(dict1[p], dict) and isinstance(dict2[p], dict):
                     sub_diff_dict = cls._get_diffs(
-                        dict1[p], dict2[p], ignore_missing_keys
+                        dict1[p], dict2[p], ignore_missing_keys, diff_lists
                     )
                     if sub_diff_dict:
                         ret_dict.update({p: sub_diff_dict})
+                elif isinstance(dict1[p], list) and isinstance(dict2[p], list) and diff_lists:
+                    list_diff = []
+
+                    len1 = len(dict1[p])
+                    len2 = len(dict2[p])
+                    length = max(len1, len2)
+                    has_diff = False
+                    for idx in range(length):
+                        idx_diff = {}
+                        if idx < len1 and idx < len2:
+                            idx_diff = cls._get_diffs(dict1[p][idx], dict2[p][idx],
+                                                           ignore_missing_keys, diff_lists)
+                        elif idx < len1:
+                            idx_diff = {"new": dict1[p][idx], "old": cls.NONE_VALUE}
+                        else:
+                            idx_diff = {"new": cls.NONE_VALUE, "old": dict2[p][idx]}
+
+                        if idx_diff: has_diff = True
+                        list_diff.append(idx_diff)
+
+                    if has_diff:
+                        ret_dict.update({p: list_diff})
+
                 else:
                     ret_dict.update({p: {"new": dict1[p], "old": dict2[p]}})
         if not ignore_missing_keys:
