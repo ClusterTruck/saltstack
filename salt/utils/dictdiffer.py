@@ -217,7 +217,7 @@ class RecursiveDictDiffer(DictDiffer):
                     if sub_diff_dict:
                         ret_dict.update({p: sub_diff_dict})
                 elif isinstance(dict1[p], list) and isinstance(dict2[p], list) and diff_lists:
-                    list_diff = []
+                    list_diff = {}
 
                     len1 = len(dict1[p])
                     len2 = len(dict2[p])
@@ -233,8 +233,9 @@ class RecursiveDictDiffer(DictDiffer):
                         else:
                             idx_diff = {"new": cls.NONE_VALUE, "old": dict2[p][idx]}
 
-                        if idx_diff: has_diff = True
-                        list_diff.append(idx_diff)
+                        if idx_diff:
+                            has_diff = True
+                            list_diff["[{0}]".format(idx)] = idx_diff
 
                     if has_diff:
                         ret_dict.update({p: list_diff})
