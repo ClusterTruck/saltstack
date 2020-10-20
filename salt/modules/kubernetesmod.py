@@ -2199,7 +2199,7 @@ def __read_and_render_template_file(source, template, saltenv):
                     "Unknown template specified: {0}".format(template)
                 )
 
-        return contents
+        return contents.decode("utf-8")
 
 def __read_and_render_yaml_file(source, template, saltenv):
     """
