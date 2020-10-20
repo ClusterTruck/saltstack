@@ -457,7 +457,7 @@ def deployments(namespace="default", **kwargs):
     """
     cfg = _setup_conn(**kwargs)
     try:
-        api_instance = kubernetes.client.ExtensionsV1beta1Api()
+        api_instance = kubernetes.client.AppsV1Api()
         api_response = api_instance.list_namespaced_deployment(namespace)
 
         return [dep["metadata"]["name"] for dep in api_response.to_dict().get("items")]
@@ -467,7 +467,7 @@ def deployments(namespace="default", **kwargs):
         else:
             log.exception(
                 "Exception when calling "
-                "ExtensionsV1beta1Api->list_namespaced_deployment"
+                "AppsV1Api->list_namespaced_deployment"
             )
             raise CommandExecutionError(exc)
     finally:
@@ -705,7 +705,7 @@ def show_deployment(name, namespace="default", **kwargs):
     """
     cfg = _setup_conn(**kwargs)
     try:
-        api_instance = kubernetes.client.ExtensionsV1beta1Api()
+        api_instance = kubernetes.client.AppsV1Api()
         api_response = api_instance.read_namespaced_deployment(name, namespace)
 
         return api_response.to_dict()
@@ -715,7 +715,7 @@ def show_deployment(name, namespace="default", **kwargs):
         else:
             log.exception(
                 "Exception when calling "
-                "ExtensionsV1beta1Api->read_namespaced_deployment"
+                "AppsV1Api->read_namespaced_deployment"
             )
             raise CommandExecutionError(exc)
     finally:
@@ -985,7 +985,7 @@ def delete_deployment(name, namespace="default", **kwargs):
     body = kubernetes.client.V1DeleteOptions(orphan_dependents=True)
 
     try:
-        api_instance = kubernetes.client.ExtensionsV1beta1Api()
+        api_instance = kubernetes.client.AppsV1Api()
         api_response = api_instance.delete_namespaced_deployment(
             name=name, namespace=namespace, body=body
         )
@@ -1021,7 +1021,7 @@ def delete_deployment(name, namespace="default", **kwargs):
         else:
             log.exception(
                 "Exception when calling "
-                "ExtensionsV1beta1Api->delete_namespaced_deployment"
+                "AppsV1Api->delete_namespaced_deployment"
             )
             raise CommandExecutionError(exc)
     finally:
@@ -1322,7 +1322,7 @@ def create_deployment(
     cfg = _setup_conn(**kwargs)
 
     try:
-        api_instance = kubernetes.client.ExtensionsV1beta1Api()
+        api_instance = kubernetes.client.AppsV1Api()
         api_response = api_instance.create_namespaced_deployment(namespace, body)
 
         return api_response.to_dict()
@@ -1332,7 +1332,7 @@ def create_deployment(
         else:
             log.exception(
                 "Exception when calling "
-                "ExtensionsV1beta1Api->create_namespaced_deployment"
+                "AppsV1Api->create_namespaced_deployment"
             )
             raise CommandExecutionError(exc)
     finally:
@@ -1725,7 +1725,7 @@ def replace_deployment(
     cfg = _setup_conn(**kwargs)
 
     try:
-        api_instance = kubernetes.client.ExtensionsV1beta1Api()
+        api_instance = kubernetes.client.AppsV1Api()
         svc_kwargs = {}
         if __opts__["test"] or kwargs.get("dry_run"): svc_kwargs["dry_run"] = "All"
         api_response = api_instance.replace_namespaced_deployment(name, namespace, body, **svc_kwargs)
@@ -1737,7 +1737,7 @@ def replace_deployment(
         else:
             log.exception(
                 "Exception when calling "
-                "ExtensionsV1beta1Api->replace_namespaced_deployment"
+                "AppsV1Api->replace_namespaced_deployment"
             )
             raise CommandExecutionError(exc)
     finally:
